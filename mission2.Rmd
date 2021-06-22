@@ -1,0 +1,114 @@
+---
+title: "Mission2"
+author: "Ujjval Sharma"
+date: "4/13/2021"
+output: word_document
+---
+## R Markdown
+
+In this graph, we are comparing survival rate among different continents, we can see that almost everyone has a survival rate above 96%. However, others have a survival rate close to 90%.
+Survial rate= (cases-death)/cases
+ This would tell the time series for the survival rate.
+ 
+```{r}
+library(readr)
+library(tidyverse)
+library(dplyr)
+all_cases <- read_csv("/Users/ujjvalsharma/Documents/data-science/project work/mission2/data-set/ddf--datapoints--cases--by--geo_id--day.csv")
+
+all_death <- read_csv("/Users/ujjvalsharma/Documents/data-science/project work/mission2/data-set/ddf--datapoints--deaths--by--geo_id--day.csv")
+
+all_geo_names <- read_csv("/Users/ujjvalsharma/Documents/data-science/project work/mission2/data-set/ddf--entities--geo_id.csv")
+
+all_cases[, 3] =all_cases[, 3] + 1 #adding +1 for 0 cases
+all_death[, 3] =all_death[, 3] + 1 #adding +1 for 0 death
+
+# this code is used to get survivial rate for each contient
+all_cases_grp_geo<-all_cases %>%
+  group_by(geo_id) %>%
+  summarize(sum(cases, na.rm=TRUE)) 
+
+all_death_grp_geo<-all_death %>%
+  group_by(geo_id) %>%
+  summarize(sum(deaths, na.rm=TRUE))
+
+names(all_cases_grp_geo)[2] <- "cases"
+names(all_death_grp_geo)[2] <- "deaths"
+
+
+all_cases_grp_contient<-inner_join(all_cases_grp_geo, all_geo_names, by=c("geo_id"="geo_id"))  %>%
+  group_by(continent_exp) %>%
+  summarize(sum(cases, na.rm=TRUE))
+
+all_death_grp_contient<-inner_join(all_death_grp_geo, all_geo_names, by=c("geo_id"="geo_id"))  %>%
+  group_by(continent_exp) %>%
+  summarize(sum(deaths, na.rm=TRUE))
+
+names(all_cases_grp_contient)[2] <- "cases"
+names(all_death_grp_contient)[2] <- "deaths"
+
+cases_death_contient<- inner_join(all_cases_grp_contient, all_death_grp_contient, by=c("continent_exp"="continent_exp")) 
+
+
+cases_death_contient <- transform(cases_death_contient, survival_count=cases-deaths)
+
+
+cases_death_contient<-cases_death_contient %>% filter(survival_count>0)
+
+cases_death_contient <- transform(cases_death_contient, survival_rate=(survival_count/cases)*100)
+
+
+ggplot(cases_death_contient, aes(x = continent_exp,y = survival_rate))+
+  geom_point()+
+  labs(title="Continent vs Survival Rate",
+       x ="Continent", y = "Survival Rate")
+```
+ 
+ We can see that the survival rate from Jan 2020 to Dec 2020 was mostly 100%, but there few days in between where the survival rate was close to 0% as the cases to death ratio is negligible. We can see an interesting point that number of people healthy each day were more than the number of people who died as the survival rate was always above 0%. Also, only Asia and Oceania reported close 0% survival between Jan and Apr. Moreover, Africa’ survival rate was rising from Feb to Dec to 100%.
+```{r}
+all_day_cases_grp_contient<-inner_join(all_cases, all_geo_names, by=c("geo_id"="geo_id"))  %>%
+  group_by(continent_exp,day) %>%
+  summarize(sum(cases, na.rm=TRUE))
+
+all_day_death_grp_contient<-inner_join(all_death, all_geo_names, by=c("geo_id"="geo_id"))  %>%
+  group_by(continent_exp,day) %>%
+  summarize(sum(deaths, na.rm=TRUE))
+
+
+
+names(all_day_cases_grp_contient)[3] <- "cases"
+names(all_day_death_grp_contient)[3] <- "deaths"
+
+
+all_cases_death_day<-inner_join(all_day_death_grp_contient, all_day_cases_grp_contient, by=c("continent_exp"="continent_exp","day"="day"))
+
+
+all_cases_death_day <- transform(all_cases_death_day, survival_count=cases-deaths)
+
+all_cases_death_day<-all_cases_death_day %>% filter(survival_count>0)
+
+all_cases_death_day <- transform(all_cases_death_day, survival_rate= ifelse(cases>0,(survival_count/cases)*100,100))
+
+all_cases_death_day <- transform(all_cases_death_day, covid_date= as.Date(paste(paste(substr(day, 1, 4),substr(day, 5, 6), sep="-"),
+                                                                        substr(day, 7, 8),sep="-")))
+
+
+names(all_cases_death_day)[names(all_cases_death_day) == "continent_exp"] <- "continent"
+
+  ggplot(all_cases_death_day, aes(x=covid_date, y=survival_rate,color=continent)) +
+  geom_line() + 
+  theme(axis.text.x=element_text(angle=60, hjust=1))+
+    labs(title="Time series for surivival rate for each continent",
+         x ="Date", y = "Survivial Rate")
+  
+```
+
+In this graph, we can see that almost all continents survival rate was rising from Jan 2020 to Dec 2020, but Oceania saw a plummet in survival rate for some days from April to July. In addition to that, saw a similar downfall from October to December.
+```{r}
+  ggplot(all_cases_death_day, aes(x=covid_date, y=survival_rate,color=continent)) +
+    geom_point() + 
+    theme(axis.text.x=element_text(angle=60, hjust=1))+
+    labs(title="Surivival rate for each day of different continents",
+         x ="Date", y = "survivial rate")
+```
+```
